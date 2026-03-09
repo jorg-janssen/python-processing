@@ -9,6 +9,10 @@ from .core.public_globals import PUBLIC_GLOBAL_NAMES
 from .core.dispatch import invoke_handler
 from .core.input_async import AsyncInputManager
 from .core.runtime import run_app
+from .api import drawing as _drawing_api
+from .api import style as _style_api
+from .api import system as _system_api
+from .api import utils as _utils_api
 
 
 _width = 800
@@ -63,303 +67,114 @@ is_key_pressed = False
 # Processing-achtige API
 # --------------------
 
+def _state():
+    return globals()
+
 def size(w, h):
-    global _width, _height
-    _width, _height = int(w), int(h)
-    _set_public_global("width", _width)
-    _set_public_global("height", _height)
-    _set_public_global("pixel_width", _width)
-    _set_public_global("pixel_height", _height)
+    _system_api.size(_state(), _set_public_global, w, h)
 
 def full_screen():
-    global _fullscreen_enabled, _width, _height, _screen
-    _fullscreen_enabled = True
-
-    if _screen is not None:
-        info = pygame.display.Info()
-        _width, _height = int(info.current_w), int(info.current_h)
-        _screen = pygame.display.set_mode((_width, _height), pygame.FULLSCREEN)
-        _set_public_global("width", _width)
-        _set_public_global("height", _height)
-        _set_public_global("pixel_width", _width)
-        _set_public_global("pixel_height", _height)
+    _system_api.full_screen(_state(), pygame, _set_public_global)
 
 def frame_rate(fps):
-    global _fps
-    _fps = int(fps)
+    _system_api.frame_rate(_state(), fps)
 
 def title(t):
-    global _title
-    _title = str(t)
-    # Also apply immediately when the window already exists (e.g. title() in setup()).
-    if _screen is not None:
-        pygame.display.set_caption(_title)
+    _system_api.title(_state(), pygame, t)
 
 def window_icon(path="icon.png"):
     """
     Stel het venster-icoon in. Standaard zoekt dit naar processing/icon.png.
     """
-    global _window_icon
-    _window_icon = str(path)
-
-    # If the window already exists, apply immediately as well.
-    if _screen is not None:
-        _apply_window_icon()
+    _system_api.window_icon(_state(), _apply_window_icon, path)
 
 def background(*args):
-    _require_screen("background")
-    # grayscale or rgb overload
-    if len(args) == 1:
-        g = int(args[0])
-        col = (g, g, g)
-    elif len(args) == 3:
-        col = tuple(int(v) for v in args)
-    else:
-        raise TypeError("background() takes 1 or 3 arguments")
-    _screen.fill(col)
+    _drawing_api.background(_state(), _require_screen, *args)
 
 def rect(x, y, w, h):
-    _require_screen("rect")
-    x, y, w, h = map(int, (x, y, w, h))
-    if _fill_enabled:
-        pygame.draw.rect(_screen, _fill_color, (x, y, w, h), 0)
-    if _stroke_enabled:
-        pygame.draw.rect(_screen, _stroke_color, (x, y, w, h), int(_stroke_weight))
+    _drawing_api.rect(_state(), _require_screen, x, y, w, h)
 
 def circle(x, y, d):
-    _require_screen("circle")
-    x, y, d = int(x), int(y), int(d)
-    radius = d // 2
-    if _fill_enabled:
-        pygame.draw.circle(_screen, _fill_color, (x, y), radius, 0)
-    if _stroke_enabled:
-        pygame.draw.circle(_screen, _stroke_color, (x, y), radius, int(_stroke_weight))
+    _drawing_api.circle(_state(), _require_screen, x, y, d)
 
 # additional primitives
 
 def point(x, y):
-    _require_screen("point")
-    x, y = int(x), int(y)
-    if _stroke_enabled:
-        _screen.set_at((x, y), _stroke_color)
+    _drawing_api.point(_state(), _require_screen, x, y)
 
 def line(x1, y1, x2, y2):
-    _require_screen("line")
-    pts = _apply_coords((x1, y1, x2, y2))
-    if _stroke_enabled:
-        pygame.draw.line(_screen, _stroke_color, pts[:2], pts[2:], int(_stroke_weight))
+    _drawing_api.line(_state(), _require_screen, _apply_coords, x1, y1, x2, y2)
 
 def triangle(x1, y1, x2, y2, x3, y3):
-    _require_screen("triangle")
-    pts = _apply_coords((x1, y1, x2, y2, x3, y3))
-    if _fill_enabled:
-        pygame.draw.polygon(_screen, _fill_color, [pts[0:2], pts[2:4], pts[4:6]])
-    if _stroke_enabled:
-        pygame.draw.polygon(_screen, _stroke_color, [pts[0:2], pts[2:4], pts[4:6]], int(_stroke_weight))
+    _drawing_api.triangle(_state(), _require_screen, _apply_coords, x1, y1, x2, y2, x3, y3)
 
 def quad(x1, y1, x2, y2, x3, y3, x4, y4):
-    _require_screen("quad")
-    pts = _apply_coords((x1, y1, x2, y2, x3, y3, x4, y4))
-    pts_list = [pts[i:i+2] for i in range(0, 8, 2)]
-    if _fill_enabled:
-        pygame.draw.polygon(_screen, _fill_color, pts_list)
-    if _stroke_enabled:
-        pygame.draw.polygon(_screen, _stroke_color, pts_list, int(_stroke_weight))
+    _drawing_api.quad(_state(), _require_screen, _apply_coords, x1, y1, x2, y2, x3, y3, x4, y4)
 
 def ellipse(x, y, w, h):
-    _require_screen("ellipse")
-    x, y, w, h = map(int, (x, y, w, h))
-    rect = (x - w//2, y - h//2, w, h)
-    if _fill_enabled:
-        pygame.draw.ellipse(_screen, _fill_color, rect, 0)
-    if _stroke_enabled:
-        pygame.draw.ellipse(_screen, _stroke_color, rect, int(_stroke_weight))
+    _drawing_api.ellipse(_state(), _require_screen, x, y, w, h)
 
 # style functions
 
 def fill(r, g=None, b=None):
-    global _fill_enabled, _fill_color
-    _fill_enabled = True
-    if g is None:
-        g = r
-        _fill_color = (int(r), int(r), int(r))
-    else:
-        _fill_color = (int(r), int(g), int(b))
+    _style_api.fill(_state(), r, g, b)
 
 def no_fill():
-    global _fill_enabled
-    _fill_enabled = False
+    _style_api.no_fill(_state())
 
 def stroke(r, g=None, b=None):
-    global _stroke_enabled, _stroke_color
-    _stroke_enabled = True
-    if g is None:
-        g = r
-        _stroke_color = (int(r), int(r), int(r))
-    else:
-        _stroke_color = (int(r), int(g), int(b))
+    _style_api.stroke(_state(), r, g, b)
 
 def no_stroke():
-    global _stroke_enabled
-    _stroke_enabled = False
+    _style_api.no_stroke(_state())
 
 def stroke_weight(w):
-    global _stroke_weight
-    _stroke_weight = int(w)
+    _style_api.stroke_weight(_state(), w)
 
 # helpers for colors and text
 
 def color(r, g=None, b=None, a=None):
-    if g is None:
-        return (int(r), int(r), int(r))
-    col = (int(r), int(g), int(b))
-    if a is not None:
-        col = (*col, int(a))
-    return col
+    return _style_api.color(r, g, b, a)
 
 def text_size(sz):
-    global _text_size, _font
-    _text_size = int(sz)
-    _font = None  # will recreate on next draw
+    _style_api.text_size(_state(), sz)
 
 def text(txt, x, y):
-    _require_screen("text")
-    _ensure_font()
-    surf = _font.render(str(txt), True, _fill_color if _fill_enabled else _stroke_color)
-    x = int(x)
-    y = int(y)
-
-    if _text_align_x == CENTER:
-        x -= surf.get_width() // 2
-    elif _text_align_x == RIGHT:
-        x -= surf.get_width()
-
-    if _text_align_y == CENTER:
-        y -= surf.get_height() // 2
-    elif _text_align_y == BOTTOM:
-        y -= surf.get_height()
-    elif _text_align_y == BASELINE:
-        y -= _font.get_ascent()
-
-    _screen.blit(surf, (x, y))
-
-def _parse_text_align(value, axis):
-    if axis == "x":
-        if value in (LEFT, CENTER, RIGHT):
-            return value
-        x_map = {"LEFT": LEFT, "CENTER": CENTER, "RIGHT": RIGHT}
-        key = str(value).upper()
-        if key in x_map:
-            return x_map[key]
-        raise ValueError("text_align() x alignment must be LEFT, CENTER, or RIGHT")
-
-    if value in (TOP, CENTER, BOTTOM, BASELINE):
-        return value
-    y_map = {"TOP": TOP, "CENTER": CENTER, "BOTTOM": BOTTOM, "BASELINE": BASELINE}
-    key = str(value).upper()
-    if key in y_map:
-        return y_map[key]
-    raise ValueError("text_align() y alignment must be TOP, CENTER, BOTTOM, or BASELINE")
+    _drawing_api.text(_state(), _require_screen, _ensure_font, txt, x, y)
 
 def text_align(align_x, align_y=None):
-    global _text_align_x, _text_align_y
-
-    _text_align_x = _parse_text_align(align_x, "x")
-
-    if align_y is not None:
-        _text_align_y = _parse_text_align(align_y, "y")
+    _style_api.text_align(_state(), align_x, align_y)
 
 def random(low=None, high=None):
-    if low is None and high is None:
-        return _random_module.random()
-    if high is None:
-        return _random_module.uniform(0.0, float(low))
-    return _random_module.uniform(float(low), float(high))
+    return _utils_api.random_value(low, high, _random_module)
 
 def millis():
-    if _millis_start is not None:
-        return int(pygame.time.get_ticks() - _millis_start)
-    return int(time.perf_counter() * 1000)
+    return _utils_api.millis_value(_state(), pygame, time)
 
 def nf(value, left=0, right=0):
-    left = int(left)
-    right = int(right)
-
-    number = float(value)
-    sign = "-" if number < 0 else ""
-    abs_number = abs(number)
-    formatted = f"{abs_number:.{max(0, right)}f}"
-
-    if "." in formatted:
-        int_part, frac_part = formatted.split(".", 1)
-        if left > 0:
-            int_part = int_part.zfill(left)
-        if right > 0:
-            formatted = f"{int_part}.{frac_part}"
-        else:
-            formatted = int_part
-    elif left > 0:
-        formatted = formatted.zfill(left)
-
-    return sign + formatted
+    return _utils_api.nf_format(value, left, right)
 
 def load_image(path):
-    resolved = _resolve_icon_path(str(path))
-    return pygame.image.load(resolved)
+    return _drawing_api.load_image(_state(), _resolve_icon_path, path)
 
 def image(img, x, y, w=None, h=None):
-    _require_screen("image")
-
-    if isinstance(img, str):
-        img = load_image(img)
-
-    if not isinstance(img, pygame.Surface):
-        raise TypeError("image() expects a pygame Surface or a path string")
-
-    x, y = _apply_coords((x, y))
-
-    if w is None and h is None:
-        _screen.blit(img, (x, y))
-        return
-
-    if w is None or h is None:
-        raise TypeError("image() requires both w and h when scaling")
-
-    w, h = _apply_coords((w, h))
-    if w <= 0 or h <= 0:
-        raise ValueError("image() width and height must be > 0")
-
-    scaled = pygame.transform.smoothscale(img, (w, h))
-    _screen.blit(scaled, (x, y))
+    _drawing_api.image(_state(), _require_screen, _apply_coords, _resolve_icon_path, img, x, y, w, h)
 
 def request_input(prompt="> "):
     """
     Start een asynchrone console input request.
     Returnt True als een nieuwe request gestart is, False als er al één pending is.
     """
-    return _input_manager.request_input(prompt)
+    return _system_api.request_input(_input_manager, prompt)
 
 def input_pending():
-    return _input_manager.input_pending()
+    return _system_api.input_pending(_input_manager)
 
 def arc(x, y, w, h, start, stop):
-    _require_screen("arc")
-    rect = pygame.Rect(_apply_coords((x - w/2, y - h/2, w, h)))
-    if _stroke_enabled:
-        pygame.draw.arc(_screen, _stroke_color, rect, float(start), float(stop), int(_stroke_weight))
+    _drawing_api.arc(_state(), _require_screen, _apply_coords, x, y, w, h, start, stop)
 
 def bezier(x1, y1, x2, y2, x3, y3, x4, y4, segments=20):
-    _require_screen("bezier")
-    pts = _apply_coords((x1, y1, x2, y2, x3, y3, x4, y4))
-    path = []
-    for i in range(segments + 1):
-        t = i / segments
-        # cubic bezier formula
-        x = ( (1-t)**3 * pts[0] + 3*(1-t)**2*t * pts[2] + 3*(1-t)*t**2 * pts[4] + t**3 * pts[6] )
-        y = ( (1-t)**3 * pts[1] + 3*(1-t)**2*t * pts[3] + 3*(1-t)*t**2 * pts[5] + t**3 * pts[7] )
-        path.append((int(x), int(y)))
-    if _stroke_enabled and len(path) > 1:
-        pygame.draw.lines(_screen, _stroke_color, False, path, int(_stroke_weight))
+    _drawing_api.bezier(_state(), _require_screen, _apply_coords, x1, y1, x2, y2, x3, y3, x4, y4, segments)
 
 
 # --------------------
