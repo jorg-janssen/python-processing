@@ -26,6 +26,7 @@ nf_test_value = ""
 nf_test_status = "not-run"
 text_align_status = "not-run"
 fullscreen_test_status = "not-run"
+size_test_status = "not-run"
 
 # Test full_screen() before run() initializes the window.
 full_screen()
@@ -49,10 +50,17 @@ def setup():
     global image_test_status, image_test_surface
     global random_test_status, random_last_value
     global millis_start_value, millis_test_status
-    global nf_test_value, nf_test_status, text_align_status, fullscreen_test_status
+    global nf_test_value, nf_test_status, text_align_status, fullscreen_test_status, size_test_status
     frame_rate(60)
     title("processing.py API + Event Handler Test")
     text_size(18)
+
+    # Test size() function resizing the window
+    size(1000, 600)
+    if width == 1000 and height == 600:
+        size_test_status = "ok"
+    else:
+        size_test_status = "failed-got-" + str(width) + "x" + str(height)
 
     if width == display_width and height == display_height:
         fullscreen_test_status = "ok"
@@ -186,6 +194,7 @@ def draw():
     text("nf() status: " + nf_test_status + " value=" + nf_test_value, 500, 495)
     text("text_align() status: " + text_align_status, 500, 520)
     text("full_screen() status: " + fullscreen_test_status, 500, 545)
+    text("size() status: " + size_test_status, 500, 570)
 
     # text_align() visual test: all labels should line up around the anchors.
     text_align(LEFT, TOP)

@@ -1,18 +1,4 @@
-# API Reference
-
-This document describes the public API exposed by `from processing import *`.
-
-Notes:
-- This project uses `snake_case` function and variable names.
-- The API is inspired by Processing, with Python naming conventions.
-
-## Structure
-
-### `size(w, h)`
-Set the sketch window size in pixels.
-
-### `full_screen()`
-Switch the sketch window to fullscreen mode.
+.ven
 
 ### `frame_rate(fps)`
 Set the target frame rate for interactive mode.

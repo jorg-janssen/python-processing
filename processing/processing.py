@@ -79,7 +79,7 @@ def _state():
 
 def size(w, h):
     """Set the sketch window size in pixels."""
-    _system_api.size(_state(), _set_public_global, w, h)
+    _system_api.size(_state(), pygame, _set_public_global, w, h)
 
 def full_screen():
     """Switch the sketch window to fullscreen mode."""

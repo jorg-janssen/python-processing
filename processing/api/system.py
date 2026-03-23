@@ -1,9 +1,12 @@
-def size(state, set_public_global, w, h):
+def size(state, pygame, set_public_global, w, h):
     state["_width"], state["_height"] = int(w), int(h)
     set_public_global("width", state["_width"])
     set_public_global("height", state["_height"])
     set_public_global("pixel_width", state["_width"])
     set_public_global("pixel_height", state["_height"])
+
+    if state["_screen"] is not None:
+        state["_screen"] = pygame.display.set_mode((state["_width"], state["_height"]))
 
 
 def full_screen(state, pygame, set_public_global):
